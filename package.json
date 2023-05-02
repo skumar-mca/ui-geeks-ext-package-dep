@@ -25,6 +25,8 @@
   "keywords": [
     "npm",
     "package dependencies",
+    "dev dependencies",
+    "npm modules",
     "report",
     "npm packages"
   ],
@@ -51,7 +53,7 @@
     "esbuild-base": "esbuild ./src/extension.js --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
     "esbuild": "npm run esbuild-base",
     "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
-    "build:package": "vsce package --baseContentUrl none",
+    "build:package": "vsce package",
     "lint": "eslint.",
     "pretest": "npm run lint"
   },
