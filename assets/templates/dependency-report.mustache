@@ -1,0 +1,51 @@
+<style>
+  {{  commonCSS  }}
+.table-dep { margin-bottom:40px; }
+.table-dep th:nth-child(1){ width: 80px;}
+.table-dep th:nth-child(3){ width: 120px;}
+</style>
+
+<script>
+
+const vscode = acquireVsCodeApi();    
+function downloadReport() {
+    vscode.postMessage({
+        command: 'downloadReport',
+        text: 'Download Report Now'
+    })
+}
+</script>
+
+<div>
+    <div style="display: flex;">
+        <h2 class="header">
+            NPM Dependency Report
+            <span class='email-link header-link-actions'>
+                <span class='color-grey'> &#10515; &nbsp;<a class='no-link'  href='javascript:void(0)' title='Download Report in PDF Format' onclick="downloadReport()">Download PDF</a></span>
+            </span>
+        </h2>
+
+    </div>
+
+    <div style="border-bottom: 1px solid #8b8989; margin-bottom: 15px;"> </div>
+
+    <div class="content">
+        <div class="content-box box box-info">
+            <div class="field-label">Application Name</div>
+            <div class="field-value">{{ projectName }}</div>
+        </div>
+
+        <div class="content-box box box-info">
+            <div class="field-label">Version</div>
+            <div class="field-value">{{ version }}</div>
+        </div>
+
+        <div class="content-box box box-info">
+            <div class="field-label">Description</div>
+            <div class="field-value">{{ description }}</div>
+        </div>
+    </div>
+    <br/>
+    <br/>
+</div>
+
