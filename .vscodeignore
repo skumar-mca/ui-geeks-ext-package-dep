@@ -8,4 +8,4 @@ test/**
 .eslintrc.json
 tsconfig.json
 typings/**
-node_modules/**
+

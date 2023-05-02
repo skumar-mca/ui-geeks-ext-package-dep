@@ -43,7 +43,7 @@ If you have any issues report them at <a href='https://github.com/skumar-mca/ui-
 <hr>
 <br/>
 
-## Want to support for the work
+## Want to appreciate the work
 
 <br/>
 
