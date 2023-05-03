@@ -28,7 +28,9 @@
     "dev dependencies",
     "npm modules",
     "report",
-    "npm packages"
+    "npm packages",
+    "ui-geeks",
+    "ui geeks"
   ],
   "homepage": "https://github.com/skumar-mca/ui-geeks-ext-package-dep#readme",
   "contributes": {
@@ -59,7 +61,6 @@
   },
   "devDependencies": {
     "@types/glob": "8.1.0",
-    "@types/mustache": "4.2.2",
     "@types/node": "16.x",
     "@types/vscode": "1.76.0",
     "@vscode/vsce": "2.19.0",
@@ -70,6 +71,7 @@
   "dependencies": {
     "fs-extra": "^9.0.0",
     "mustache": "^4.0.1",
+    "@types/mustache": "4.2.2",
     "pdf-master": "^1.1.0"
   }
 }
