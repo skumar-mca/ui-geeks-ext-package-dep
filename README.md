@@ -11,7 +11,7 @@ This extention will generate NPM Package Dependencies report, which can also be 
 2. Launch VS Code.
 3. Launch the command palette by using Ctrl-Shift-P (Windows, Linux) or Cmd-Shift-P (OSX).
 4. Type in Install Extension and select 'Extensions : Install Extensions'.
-5. Type Package Dependency Report.
+5. Type NPM Dependency Report.
 6. Choose the extension from the drop down.
 7. Reload Visual Studio Code.
 
@@ -22,12 +22,12 @@ This extention will generate NPM Package Dependencies report, which can also be 
 ### From Command palette
 
 1.  Launch the command palette by using Ctrl-Shift-P (Windows, Linux) or Cmd-Shift-P (OSX).
-2.  Type <b>Package Dependency Report<b>.
+2.  Type <b>NPM Dependency Report<b>.
 
 ### From Context Menu
 
 1.  Right click on <b>package.json</b> file in File Explorer.
-2.  Select 'Package Dependency Report' from the context menu.
+2.  Select 'NPM Dependency Report' from the context menu.
     <br/><br/>
 
 ## Contact
