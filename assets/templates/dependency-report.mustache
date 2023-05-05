@@ -14,6 +14,22 @@ function downloadReport() {
         text: 'Download Report Now'
     })
 }
+
+window.addEventListener('message', event => {
+    const message = event.data; 
+    const downloadBtn = document.getElementById('downloadLink');
+    
+    switch (message.command) {
+        case 'downloadingPDFStart': 
+            if(downloadBtn) { downloadBtn.textContent = 'Downloading PDF...'; }
+        break;
+
+        case 'downloadingPDFEnd': 
+            if(downloadBtn) {  downloadBtn.textContent = 'Download PDF'; }
+        break;
+    }
+});
+
 </script>
 
 <div>
@@ -21,7 +37,7 @@ function downloadReport() {
         <h2 class="header">
             NPM Dependency Report
             <span class='email-link header-link-actions'>
-                <span class='color-grey'> &#10515; &nbsp;<a class='no-link'  href='javascript:void(0)' title='Download Report in PDF Format' onclick="downloadReport()">Download PDF</a></span>
+                <span class='color-grey'> &#10515; &nbsp;<a class='no-link'  id='downloadLink' href='javascript:void(0)' title='Download Report in PDF Format' onclick="downloadReport()">Download PDF</a></span>
             </span>
         </h2>
 

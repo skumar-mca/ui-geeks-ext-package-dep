@@ -1,8 +1,8 @@
-# npm-dependencies-ui-geeks <img src="images/npm.png" alt="NPM icon">
+# npm-dependencies-ui-geeks <img src="images/readme/npm.png" alt="NPM icon">
 
 This extention will generate NPM Package Dependencies report, which can also be downloaded in PDF format.
 <br/><br/>
-<img src="images/demo.gif" alt="demo of the extension">
+<img src="images/readme/demo.gif" alt="demo of the extension">
 <br/><br/>
 
 ## Installation
@@ -47,7 +47,7 @@ If you have any issues report them at <a href='https://github.com/skumar-mca/ui-
 
 <br/>
 
-<a href="https://bmc.link/skumarmca2010"><img src="images/buy-me-a-coffee.png" alt="buy me a coffee" /></a>
+<a href="https://bmc.link/skumarmca2010"><img src="images/readme/buy-me-a-coffee.png" alt="buy me a coffee" /></a>
 <br/> Your opportunity to say thanks for the free stuff and to encourage me to do even more<br/><br/>
 
-<img src="images/npm-package-dep-qr.png" alt="buy me coffee" height="150px">
+<img src="images/readme/npm-package-dep-qr.png" alt="buy me coffee" height="150px">

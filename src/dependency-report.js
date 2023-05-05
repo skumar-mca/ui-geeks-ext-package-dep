@@ -8,9 +8,7 @@ const {
   DEPENDENCY_META
 } = require('./constants');
 const { findFile, getFileContent, convertObjectToArray } = require('./util');
-
 const { WebRenderer, getTemplate } = require('./web-renderer');
-const { copySync } = require('fs-extra');
 
 const webRenderer = new WebRenderer(REPORT_TEMPLATE, REPORT_TITLE);
 

@@ -8,7 +8,7 @@ const { registerCommand } = require('./util');
  */
 function activate(context) {
   console.log(
-    'Congratulations, your extension "skumar-vsc-utilities" is now active!'
+    'Congratulations, your extension "npm-dependencies-ui-geeks" is now active!'
   );
 
   const dependencyCmd = registerCommand(COMMANDS.DEPENDENCY, () =>

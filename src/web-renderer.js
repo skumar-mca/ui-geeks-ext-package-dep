@@ -1,9 +1,9 @@
-const { readFile } = require('fs-extra');
+const { readFileSync } = require('fs');
 const { render } = require('mustache');
 const { join, posix } = require('path');
 const { window, ViewColumn, workspace, Uri } = require('vscode');
-// @ts-ignore
-const pdfMaster = require('pdf-master');
+
+const puppeteer = require('puppeteer');
 
 const {
   COMMON_CSS,
@@ -49,6 +49,10 @@ class WebRenderer {
     );
   };
 
+  sendMessageToUI = (msg) => {
+    this.panel.webview.postMessage({ command: msg });
+  };
+
   createReport = () => {
     createReportFile(this, this.content);
   };
@@ -87,9 +91,9 @@ const createPanel = (title) => {
 };
 
 const getTemplate = async (template) => {
-  return await readFile(
+  return await readFileSync(
     join(__dirname, `../assets/templates/${template}.mustache`),
-    'utf8'
+    'utf-8'
   );
 };
 
@@ -133,23 +137,14 @@ const createReportFile = async (webRenderedRef, content) => {
     `${REPORT_FOLDER_NAME}/${REPORT_FILE_NAME}`
   );
 
-  const fileUriHBS = folderUri.with({ path: `${reportFileName}.hbs` });
   const filePDFUri = folderUri.with({ path: `${reportFileName}.pdf` });
-
-  // Write HTML File
-  // await workspace.fs.writeFile(fileUri, Buffer.from(content, 'utf8'));
 
   try {
     content += `<style>.header-link-actions { display: none;}</style>`;
-    await workspace.fs.writeFile(fileUriHBS, Buffer.from(content, 'utf8'));
-    const PDF = await pdfMaster.generatePdf(fileUriHBS.fsPath);
-
-    // Write PDF File
-    await workspace.fs.writeFile(filePDFUri, PDF);
-
-    //Delete HBS File
-    workspace.fs.delete(fileUriHBS, { recursive: true });
-
+    webRenderedRef.sendMessageToUI('downloadingPDFStart');
+    await createFolder(REPORT_FOLDER_NAME);
+    await createPDF(content, filePDFUri.fsPath, REPORT_TITLE);
+    webRenderedRef.sendMessageToUI('downloadingPDFEnd');
     logMsg(MSGS.REPORT_PDF_CREATED, true);
   } catch (e) {
     webRenderedRef.renderError(webRenderedRef.panel, {
@@ -172,11 +167,30 @@ const deleteReportFile = async () => {
   } catch {}
 };
 
+const createFolder = async (folderName) => {
+  const workSpaceUri = workspace.workspaceFolders[0].uri;
+  const folderUri = Uri.parse(`${workSpaceUri.path}/${folderName}`);
+  await workspace.fs.createDirectory(folderUri);
+};
+
+const createPDF = async (content, path, title) => {
+  const browser = await puppeteer.launch({ headless: 'new' });
+  const page = await browser.newPage();
+  await page.setContent(content);
+
+  await page.pdf({
+    path,
+    displayHeaderFooter: true
+  });
+};
+
 module.exports = {
   createPanel,
   getTemplate,
   renderContentOnPanel,
   renderLoader,
   renderError,
+  createPDF,
+  createFolder,
   WebRenderer
 };

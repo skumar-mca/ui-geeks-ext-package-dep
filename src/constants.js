@@ -29,11 +29,12 @@ const MSGS = {
   INVALID_SELECTION: `Invalid Selection`,
   REPORT_PDF_CREATED: `A PDF file named '${REPORT_FILE_NAME}.pdf' is download in folder '${REPORT_FOLDER_NAME}'.\n\n
   Note: Folder will automatically be deleted on closing the '${REPORT_TITLE}' tab.`,
-  PDF_ERROR: `Error generating PDF Report. Please try again later. Error: ##MESSAGE##.`
+  PDF_ERROR: `Error generating PDF Report. Please try again later. Error: ##MESSAGE##.`,
+  PREPARING_PDF: `Generating PDF, please wait...`
 };
 
 const COMMON_CSS = `
-body { font-size: 1.2em; background-color: #f6f6f6; color: black;}
+body { font-size: 1.2em; background-color: #f6f6f6; color: black; -webkit-print-color-adjust: exact; }
 .b { font-weight: bold; }
 .i { font-style: italic; }
 .text-center { text-align:center; }
