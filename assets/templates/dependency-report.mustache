@@ -8,9 +8,9 @@
 <script>
 
 const vscode = acquireVsCodeApi();    
-function downloadReport() {
+function downloadReport(reportType) {
     vscode.postMessage({
-        command: 'downloadReport',
+        command: reportType === 'html' ? 'downloadReportAsHTML' : 'downloadReportAsPDF' ,
         text: 'Download Report Now'
     })
 }
@@ -20,12 +20,12 @@ window.addEventListener('message', event => {
     const downloadBtn = document.getElementById('downloadLink');
     
     switch (message.command) {
-        case 'downloadingPDFStart': 
-            if(downloadBtn) { downloadBtn.textContent = 'Downloading PDF...'; }
+        case 'downloadingStart': 
+            if(downloadBtn) { downloadBtn.textContent = 'Downloading...'; }
         break;
 
-        case 'downloadingPDFEnd': 
-            if(downloadBtn) {  downloadBtn.textContent = 'Download PDF'; }
+        case 'downloadingEnd': 
+            if(downloadBtn) {  downloadBtn.textContent = 'Download as'; }
         break;
     }
 });
@@ -37,7 +37,8 @@ window.addEventListener('message', event => {
         <h2 class="header">
             NPM Dependency Report
             <span class='email-link header-link-actions'>
-                <span class='color-grey'> &#10515; &nbsp;<a class='no-link'  id='downloadLink' href='javascript:void(0)' title='Download Report in PDF Format' onclick="downloadReport()">Download PDF</a></span>
+                <span class='color-grey'> <span id='downloadLink'>Download as</span>&nbsp;<a class='no-link' href='javascript:void(0)' title='Download Report in HTML Format' onclick="downloadReport('html')">HTML</a>
+                |&nbsp;<a class='no-link' href='javascript:void(0)' title='Download Report in PDF Format' onclick="downloadReport('pdf')">PDF</a> </span>
             </span>
         </h2>
 

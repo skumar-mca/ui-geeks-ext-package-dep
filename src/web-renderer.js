@@ -1,4 +1,4 @@
-const { readFileSync } = require('fs');
+const { readFileSync, writeFile } = require('fs');
 const { render } = require('mustache');
 const { join, posix } = require('path');
 const { window, ViewColumn, workspace, Uri } = require('vscode');
@@ -39,8 +39,12 @@ class WebRenderer {
     this.panel.webview.onDidReceiveMessage(
       (message) => {
         switch (message.command) {
-          case 'downloadReport':
-            this.createReport();
+          case 'downloadReportAsHTML':
+            this.createReport('html');
+            return;
+
+          case 'downloadReportAsPDF':
+            this.createReport('pdf');
             return;
         }
       },
@@ -53,8 +57,8 @@ class WebRenderer {
     this.panel.webview.postMessage({ command: msg });
   };
 
-  createReport = () => {
-    createReportFile(this, this.content);
+  createReport = (reportType) => {
+    createReportFile(this, this.content, reportType);
   };
 
   onClosePanel = () => {
@@ -129,7 +133,7 @@ const renderError = async (panel, meta) => {
   panel.webview.html = content;
 };
 
-const createReportFile = async (webRenderedRef, content) => {
+const createReportFile = async (webRenderedRef, content, reportType) => {
   const folderUri = workspace.workspaceFolders[0].uri;
 
   const reportFileName = posix.join(
@@ -137,16 +141,41 @@ const createReportFile = async (webRenderedRef, content) => {
     `${REPORT_FOLDER_NAME}/${REPORT_FILE_NAME}`
   );
 
-  const filePDFUri = folderUri.with({ path: `${reportFileName}.pdf` });
-
   try {
+    webRenderedRef.sendMessageToUI('downloadingStart');
     content += `<style>.header-link-actions { display: none;}</style>`;
-    webRenderedRef.sendMessageToUI('downloadingPDFStart');
-    await createFolder(REPORT_FOLDER_NAME);
-    await createPDF(content, filePDFUri.fsPath, REPORT_TITLE);
-    webRenderedRef.sendMessageToUI('downloadingPDFEnd');
-    logMsg(MSGS.REPORT_PDF_CREATED, true);
+    let fileUri = folderUri.with({ path: `${reportFileName}.html` });
+    let filters = null;
+    let reportContent = content;
+    switch (reportType) {
+      case 'html':
+        filters = { WebPages: ['html'] };
+
+        break;
+
+      case 'pdf':
+        fileUri = folderUri.with({ path: `${reportFileName}.pdf` });
+        filters = { PDF: ['pdf'] };
+        await createFolder(REPORT_FOLDER_NAME);
+        const PDF = await createPDF(content);
+        reportContent = PDF;
+        break;
+    }
+
+    if (filters) {
+      const uri = await window.showSaveDialog({
+        filters,
+        defaultUri: fileUri
+      });
+
+      uri &&
+        writeFile(uri.fsPath, reportContent, () => {
+          logMsg(MSGS.REPORT_CREATED, true);
+          webRenderedRef.sendMessageToUI('downloadingEnd');
+        });
+    }
   } catch (e) {
+    webRenderedRef.sendMessageToUI('downloadingEnd');
     webRenderedRef.renderError(webRenderedRef.panel, {
       actionHeader: REPORT_TITLE,
       hasSolution: false,
@@ -173,15 +202,12 @@ const createFolder = async (folderName) => {
   await workspace.fs.createDirectory(folderUri);
 };
 
-const createPDF = async (content, path, title) => {
+const createPDF = async (content) => {
   const browser = await puppeteer.launch({ headless: 'new' });
   const page = await browser.newPage();
   await page.setContent(content);
-
-  await page.pdf({
-    path,
-    displayHeaderFooter: true
-  });
+  const PDF = await page.pdf();
+  return PDF;
 };
 
 module.exports = {
