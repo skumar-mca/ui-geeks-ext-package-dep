@@ -1,7 +1,7 @@
 {
   "name": "npm-dependencies-ui-geeks",
   "displayName": "NPM Dependency Report",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Generate Visual NPM Package Dependency Report.",
   "main": "./src/extension.js",
   "publisher": "skumarmca2010",
