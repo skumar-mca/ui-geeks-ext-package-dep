@@ -1,18 +1,15 @@
-const { readFileSync, writeFile } = require('fs');
-const { render } = require('mustache');
-const { join, posix } = require('path');
+const { writeFile } = require('fs');
+const { posix } = require('path');
 const { window, ViewColumn, workspace, Uri } = require('vscode');
-
-const puppeteer = require('puppeteer');
 
 const {
   COMMON_CSS,
   REPORT_FILE_NAME,
   REPORT_FOLDER_NAME,
-  REPORT_TITLE,
-  MSGS
+  MSGS,
+  REPORT_TITLE
 } = require('./constants');
-const { logMsg } = require('./util');
+const { logMsg, logErrorMsg } = require('./util');
 
 class WebRenderer {
   template = null;
@@ -20,10 +17,18 @@ class WebRenderer {
   panel = null;
   context = null;
   content = null;
+  appMeta = null;
 
   constructor(template, title) {
     this.title = title;
     this.template = template;
+  }
+
+  get applicationName() {
+    if (this.appMeta) {
+      return this.appMeta.appName;
+    }
+    return null;
   }
 
   init = async (context) => {
@@ -62,26 +67,109 @@ class WebRenderer {
   };
 
   onClosePanel = () => {
-    this.panel.onDidDispose(() => {
-      this.deleteReportFile();
-    }, null);
+    this.panel.onDidDispose(() => {}, null);
   };
 
   renderContent = (content) => {
-    this.content = content;
-    renderContentOnPanel(this.panel, content);
+    const htmlStr = `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${REPORT_TITLE}${
+      this.applicationName ? ` | ${this.applicationName}` : ''
+    }</title>
+
+        <style>
+          ${COMMON_CSS}
+          .table-dep { margin-bottom:40px; }
+          .table-dep th:nth-child(1){ width: 80px;}
+          .table-dep th:nth-child(3){ width: 120px;}
+        </style>
+    </head>
+
+    
+    <script>
+      const vscode = acquireVsCodeApi();    
+      function downloadReport(reportType) {
+          vscode.postMessage({
+              command: reportType === 'html' ? 'downloadReportAsHTML' : 'downloadReportAsPDF' ,
+              text: 'Download Report Now'
+          })
+      }
+
+      window.addEventListener('message', event => {
+        const message = event.data; 
+        const downloadBtn = document.getElementById('downloadLink');
+        
+        switch (message.command) {
+            case 'downloadingStart': 
+                if(downloadBtn) { downloadBtn.textContent = 'Downloading...'; }
+            break;
+    
+            case 'downloadingEnd': 
+                if(downloadBtn) {  downloadBtn.textContent = 'Download as'; }
+            break;
+        }
+    });
+    </script>
+
+    <body>
+        <div>
+            <div style="display: flex;">
+                <h2 class="header">
+                    NPM Dependency Report
+                    <span class='email-link header-link-actions'>
+                        <span class='color-grey'> <span id='downloadLink'>Download as</span>&nbsp;<a class='no-link' href='javascript:void(0)' title='Download Report in HTML Format' onclick="downloadReport('html')">HTML</a>
+                        </span>
+                    </span>
+                </h2>
+
+            </div>
+
+            <div style="border-bottom: 1px solid #8b8989; margin-bottom: 15px;"> </div>
+
+            <div class="content">
+                <div class="content-box box box-info">
+                    <div class="field-label">Application Name</div>
+                    <div class="field-value">${this.appMeta.appName}</div>
+                </div>
+
+                <div class="content-box box box-info">
+                    <div class="field-label">Version</div>
+                    <div class="field-value">${this.appMeta.version}</div>
+                </div>
+
+                <div class="content-box box box-info">
+                    <div class="field-label">Description</div>
+                    <div class="field-value">${this.appMeta.description}</div>
+                </div>
+            </div>
+        <br/>
+        <br/>
+    </div>
+
+
+    ${content}
+
+    </body>
+    </html>`;
+
+    this.content = htmlStr;
+
+    renderContentOnPanel(this.panel, htmlStr);
   };
 
   renderLoader = () => {
-    renderLoader(this.panel, this.title);
+    renderLoader(this, this.panel, this.title);
   };
 
   renderError = (meta) => {
-    renderError(this.panel, meta);
+    renderError(this, this.panel, meta);
   };
 
-  deleteReportFile = () => {
-    deleteReportFile();
+  setAppMetaData = (appData) => {
+    this.appMeta = appData;
   };
 }
 
@@ -94,42 +182,70 @@ const createPanel = (title) => {
   );
 };
 
-const getTemplate = async (template) => {
-  return await readFileSync(
-    join(__dirname, `../assets/templates/${template}.mustache`),
-    'utf-8'
-  );
-};
-
 const renderContentOnPanel = (panel, content) => {
   panel.webview.html = content;
 };
 
-const renderLoader = async (panel, title) => {
-  const template = await getTemplate('loader');
-  const view = { commonCSS: COMMON_CSS, actionHeader: title };
-  let content = render(template, view);
+const renderLoader = async (_this, panel, title) => {
+  const content = `
+  <!DOCTYPE html>
+    <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${REPORT_TITLE}${
+    _this.applicationName ? ` | ${_this.applicationName}` : ''
+  }</title>
+          <style>
+            ${COMMON_CSS}
+          </style>
+    </head>
+    
+      <body>
+        <h1 class="header">${title}</h1>
+        <div style="border-bottom: 1px solid #8b8989; margin-bottom: 15px"></div>
+        <div>Running ${title}...</div>
+        <br />
+      </body>
+    </html>
+`;
+
   renderContentOnPanel(panel, content);
 };
 
-const renderError = async (panel, meta) => {
-  const template = await getTemplate('error');
+const renderError = async (_this, panel, meta) => {
   const { actionHeader, hasSolution, message } = meta;
-  const view = {
-    commonCSS: COMMON_CSS,
-    actionHeader
-  };
 
-  let content = render(template, view);
+  const content = `
+  <!DOCTYPE html>
+    <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${REPORT_TITLE}${
+    _this.applicationName ? ` | ${_this.applicationName}` : ''
+  }</title>
+          <style>
+            ${COMMON_CSS}
+            body{ background: #ffa9a9; color:black; }
+          </style>
+    </head>
+    
+      <body>
+        <h1 class="header">${actionHeader} Failed</h1>
+        <div style="border-bottom: 1px solid #8b8989; margin-bottom: 15px;"> </div>
+        <br/>
+    
+        <div class="text-danger b mb-2">${
+          message || 'Something went wrong, please try again after sometime.'
+        }</div>
+    
+        ${hasSolution ? `<div class="box box-info">${hasSolution}</div>` : ''}
+      </body>
+    </html>
+`;
 
-  content += `<div class="text-danger b mb-2">${
-    message || 'Something went wrong, please try again after sometime.'
-  }</div>`;
-
-  if (hasSolution) {
-    content += `<div class="box box-info">${hasSolution}</div>`;
-  }
-
+  _this.content = content;
   panel.webview.html = content;
 };
 
@@ -143,29 +259,34 @@ const createReportFile = async (webRenderedRef, content, reportType) => {
 
   try {
     webRenderedRef.sendMessageToUI('downloadingStart');
-    content += `<style>.header-link-actions { display: none;}</style>`;
-    let fileUri = folderUri.with({ path: `${reportFileName}.html` });
+    content += `<style>.header-link-actions { display: none;} body, table { font-size:12px!important;}</style>`;
+    let fileUri = folderUri.with({ path: `${reportFileName}.${reportType}` });
     let filters = null;
     let reportContent = content;
+    let saveDialogTitle = `Save ${REPORT_TITLE}`;
+
     switch (reportType) {
       case 'html':
         filters = { WebPages: ['html'] };
-
-        break;
-
-      case 'pdf':
-        fileUri = folderUri.with({ path: `${reportFileName}.pdf` });
-        filters = { PDF: ['pdf'] };
-        await createFolder(REPORT_FOLDER_NAME);
-        const PDF = await createPDF(content);
-        reportContent = PDF;
         break;
     }
 
     if (filters) {
+      if (webRenderedRef.appMeta) {
+        fileUri = folderUri.with({
+          path: `${reportFileName}-${webRenderedRef.appMeta.appName}.${reportType}`
+        });
+
+        saveDialogTitle = `Save ${REPORT_TITLE} for ${
+          webRenderedRef.appMeta.appName || 'Application'
+        }`;
+      }
+
       const uri = await window.showSaveDialog({
         filters,
-        defaultUri: fileUri
+        defaultUri: fileUri,
+        saveLabel: `Save Report`,
+        title: saveDialogTitle
       });
 
       uri &&
@@ -176,24 +297,8 @@ const createReportFile = async (webRenderedRef, content, reportType) => {
     }
   } catch (e) {
     webRenderedRef.sendMessageToUI('downloadingEnd');
-    webRenderedRef.renderError(webRenderedRef.panel, {
-      actionHeader: REPORT_TITLE,
-      hasSolution: false,
-      message: MSGS.PDF_ERROR.replace('##MESSAGE##', e.message)
-    });
+    logErrorMsg(MSGS.PDF_ERROR, true);
   }
-};
-
-const deleteReportFile = async () => {
-  const folderUri = workspace.workspaceFolders[0].uri;
-  const folderPath = folderUri.with({
-    path: posix.join(folderUri.path, `${REPORT_FOLDER_NAME}`)
-  });
-
-  try {
-    await workspace.fs.stat(folderPath);
-    workspace.fs.delete(folderPath, { recursive: true });
-  } catch {}
 };
 
 const createFolder = async (folderName) => {
@@ -202,21 +307,11 @@ const createFolder = async (folderName) => {
   await workspace.fs.createDirectory(folderUri);
 };
 
-const createPDF = async (content) => {
-  const browser = await puppeteer.launch({ headless: 'new' });
-  const page = await browser.newPage();
-  await page.setContent(content);
-  const PDF = await page.pdf();
-  return PDF;
-};
-
 module.exports = {
   createPanel,
-  getTemplate,
   renderContentOnPanel,
   renderLoader,
   renderError,
-  createPDF,
   createFolder,
   WebRenderer
 };

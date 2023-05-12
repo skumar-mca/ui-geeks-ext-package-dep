@@ -43,7 +43,7 @@ If you have any issues report them at <a href='https://github.com/skumar-mca/ui-
 
 ## Other useful extentions
 
-<a href='https://ui-geeks.in/#/vscode-extensions'>UI Geeks | Extentions</a>
+<a href='https://ui-geeks.in/#/vscode-extensions' target='_blank'>UI Geeks | Extentions</a>
 <br/>
 
 <hr>

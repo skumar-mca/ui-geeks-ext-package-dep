@@ -5,8 +5,8 @@ const logMsg = (msg, inModal) => {
   window.showInformationMessage(msg, { modal: inModal || false });
 };
 
-const logErrorMsg = (msg) => {
-  window.showErrorMessage(msg);
+const logErrorMsg = (msg, inModal) => {
+  window.showErrorMessage(msg, { modal: inModal || false });
 };
 
 const findFile = (fileName) => {

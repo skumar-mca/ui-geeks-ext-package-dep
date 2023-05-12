@@ -1,5 +1,5 @@
 const extensionPrefix = `ui-geeks-ext-package-dep`;
-const REPORT_TITLE = 'Package Dependency Report';
+const REPORT_TITLE = 'NPM Dependency Report';
 const REPORT_TEMPLATE = 'dependency-report';
 const REPORT_FOLDER_NAME = 'ui-geeks-ext-npm-dependencies';
 const REPORT_FILE_NAME = 'package-dep-report';
@@ -28,7 +28,7 @@ const MSGS = {
   PACKAGE_JSON_NOT_FOUND: `Error: package.json file not found!`,
   INVALID_SELECTION: `Invalid Selection`,
   REPORT_CREATED: `Report downloaded successfully!`,
-  PDF_ERROR: `Error generating PDF Report. Please try again later. Error: ##MESSAGE##.`,
+  PDF_ERROR: `Error generating PDF Report. Please try again later. You may need to open VSCode in Administrator mode.`,
   PREPARING_PDF: `Generating PDF, please wait...`
 };
 

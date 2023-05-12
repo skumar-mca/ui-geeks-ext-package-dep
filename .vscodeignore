@@ -9,4 +9,5 @@ test/**
 .eslintrc.json
 tsconfig.json
 typings/**
-
+package-lock.json
+node_modules

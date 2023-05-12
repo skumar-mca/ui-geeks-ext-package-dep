@@ -1,14 +1,12 @@
-const { render } = require('mustache');
 const { window, ProgressLocation } = require('vscode');
 const {
   MSGS,
-  COMMON_CSS,
   REPORT_TEMPLATE,
   REPORT_TITLE,
   DEPENDENCY_META
 } = require('./constants');
 const { findFile, getFileContent, convertObjectToArray } = require('./util');
-const { WebRenderer, getTemplate } = require('./web-renderer');
+const { WebRenderer } = require('./web-renderer');
 
 const webRenderer = new WebRenderer(REPORT_TEMPLATE, REPORT_TITLE);
 
@@ -60,19 +58,13 @@ const createHTMLReport = async (data) => {
     peerDependencies: peer
   } = data;
 
-  const view = {
-    commonCSS: COMMON_CSS,
-    projectName,
-    version,
-    description
-  };
-
-  let content = render(await getTemplate(webRenderer.template), view);
+  let content = ``;
 
   content += renderDependency(prod, DEPENDENCY_META.dependency);
   content += renderDependency(dev, DEPENDENCY_META.devDependency);
   content += renderDependency(peer, DEPENDENCY_META.peerDependencies);
 
+  webRenderer.setAppMetaData({ appName: projectName, version, description });
   webRenderer.renderContent(content);
 };
 
