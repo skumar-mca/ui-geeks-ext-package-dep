@@ -1,6 +1,6 @@
 # npm-dependencies-ui-geeks <img src="images/readme/npm.png" alt="NPM icon">
 
-This extention will generate NPM Package Dependencies report, which can also be downloaded in PDF format.
+This extension will generate NPM Package Dependencies report, which can also be downloaded in PDF format.
 <br/><br/>
 <img src="images/readme/demo.gif" alt="demo of the extension">
 <br/><br/>
@@ -41,9 +41,9 @@ If you have any issues report them at <a href='https://github.com/skumar-mca/ui-
 
 <br/>
 
-## Other useful extentions
+## Other useful extensions
 
-<a href='https://ui-geeks.in/#/vscode-extensions' target='_blank'>UI Geeks | Extentions</a>
+<a href='https://ui-geeks.in/#/vscode-extensions' target='_blank'>UI Geeks | Extensions</a>
 <br/>
 
 <hr>
