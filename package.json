@@ -1,7 +1,7 @@
 {
   "name": "npm-dependencies-ui-geeks",
   "displayName": "UI Geeks: Audit Dependencies",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Audit dependencies for vulnerabilities & outdated packages. Generate & download report.",
   "main": "./out/extension.js",
   "publisher": "skumarmca2010",

@@ -11,7 +11,11 @@ import {
   REPORT_TITLE
 } from './constants';
 
-import { scanAgain } from './dependency-report';
+import { sendAnalyticsEvent } from './analytics';
+import {
+  findDirectPackageOfChildPackage,
+  scanAgain
+} from './dependency-report';
 import { getExtensionFileSrc, logErrorMsg, logMsg } from './util';
 
 const scriptFunctionStr = `
@@ -53,6 +57,13 @@ function updatePackage(pkgName, pkgNumber, rootFolder){
     pkgNumber: pkgNumber,
     pkgName:pkgName,
     rootFolder:rootFolder
+  });
+}
+
+function findDirectPackage(pkgName){
+  vscode.postMessage({
+    command: 'findDirectPackage',
+    pkgName
   });
 }
 
@@ -129,10 +140,15 @@ export class WebRenderer {
         switch (message.command) {
           case 'downloadReportAsHTML':
             this.createReport('html', message.webContent);
+            sendAnalyticsEvent(this, 'DEPENDENCY', 'DOWNLOADED');
             return;
 
           case 'scanAgain':
             scanAgain(this);
+            return;
+
+          case 'findDirectPackage':
+            findDirectPackageOfChildPackage(this, message.pkgName);
             return;
 
           case 'updatePackage':
@@ -142,6 +158,7 @@ export class WebRenderer {
             terminal.sendText(
               `npm install ${message.pkgName}@${message.pkgNumber} --legacy-peer-deps`
             );
+            sendAnalyticsEvent(this, 'DEPENDENCY', 'UPDATED_PACKAGE', message);
             return;
 
           case 'autoFixVulnerabilities':
@@ -149,6 +166,11 @@ export class WebRenderer {
             terminal.sendText(`cd ${message.rootFolder}`);
             terminal.show();
             terminal.sendText(`npm audit fix --force`);
+            sendAnalyticsEvent(
+              this,
+              'DEPENDENCY',
+              'AUTO_FIXED_VULNERABILITIES'
+            );
             return;
 
           case 'updateAllOutdatedPackages':
@@ -158,6 +180,14 @@ export class WebRenderer {
             terminal.sendText(
               `npm install ${message.packages} --legacy-peer-deps`
             );
+
+            sendAnalyticsEvent(
+              this,
+              'DEPENDENCY',
+              'UPDATED_ALL_PACKAGES',
+              message.packages
+            );
+
             return;
         }
       },
@@ -259,7 +289,7 @@ export class WebRenderer {
     return `
       &copy; UI Geeks, All rights reserved
       <span class='float-right'>
-        <a href='https://ui-geeks.in/#/vscode-extensions' target='_blank' class='internal-link'> Other Extensions</a>
+        <a href='https://ui-geeks.in/#/vscode-extensions' target='_blank' class='internal-link text-white'>Other Extensions</a>
       </span>
     `;
   };

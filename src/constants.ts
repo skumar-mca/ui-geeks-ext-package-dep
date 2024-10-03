@@ -10,7 +10,8 @@ export const COMMANDS = {
 
 export const LOCAL_STORAGE = {
   OUTDATED_PACKAGES: 'outdatedPackages',
-  VULNERABILITIES: 'vulnerabilities'
+  VULNERABILITIES: 'vulnerabilities',
+  ALL_VULNERABILITIES: 'all_vulnerabilities'
 };
 
 export const DEPENDENCY_META = {

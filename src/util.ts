@@ -579,6 +579,38 @@ export const runNPMCommand = (
   }
 };
 
+export const runNPMCommandAsyncAwait = async (
+  webRenderer: IWebRenderer,
+  command: string
+) => {
+  const workingDir = path.dirname(
+    webRenderer.packageLockFile.uri.path.substring(1)
+  );
+  const exec = util.promisify(require('child_process').exec);
+
+  try {
+    const result: IRecord = await exec(
+      command + (process.platform !== 'win32' ? '/' : '') + workingDir,
+      {
+        windowsHide: true,
+        cwd: workingDir
+      }
+    );
+
+    return {
+      success: true,
+      resp: isStringifiedObject(result.stdout)
+        ? JSON.parse(result.stdout)
+        : result.stdout || result
+    };
+  } catch (output: any) {
+    return {
+      success: false,
+      resp: output
+    };
+  }
+};
+
 export const installIcon = (
   size: number = 16
 ) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">
@@ -586,8 +618,24 @@ export const installIcon = (
   <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/>
 </svg>`;
 
-export const isLowerVersion = (version1: string, version2: string) => {
-  return semver.lt(version1, version2);
+export const eyeIcon = (
+  size: number
+) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size || 16}" height="${
+  size || 16
+}" fill="currentColor" class="bi bi-eye-fill" viewBox="0 0 16 16">
+  <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/>
+  <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8m8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/>
+</svg>`;
+
+export const isLowerVersion = (
+  version1: string,
+  version2: string
+): boolean | number => {
+  try {
+    return semver.lt(version1, version2);
+  } catch (e) {
+    return -1;
+  }
 };
 
 export const cleanVersion = (version: string) => {
@@ -653,3 +701,17 @@ export const splitButton = (
 };
 
 export const hrDivider = `<div style="border-bottom: 1px solid #8b8989; margin-bottom: 15px; margin-top: 15px"></div>`;
+
+export const capitalizeFirstLetter = (txt: string) => {
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+};
+
+export const getPercentage = (val: number, total: number) => {
+  return ((val / total) * 100).toFixed(1) + '%';
+};
+
+export const BADGE = {
+  GREY: (txt: string | number) => `<div class="vul-pill vul-pill-grey">
+        <div class="label">${txt}</div>
+      </div>`
+};

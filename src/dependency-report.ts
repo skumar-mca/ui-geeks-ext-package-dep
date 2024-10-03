@@ -9,15 +9,18 @@ import {
 } from './constants';
 
 import {
+  capitalizeFirstLetter,
   checkIcon,
   cleanVersion,
   convertObjectToArray,
   EXTENSION_STATE_MANAGER,
+  eyeIcon,
   formatDate,
   formatNumber,
   gearIcon,
   getLoaderIcon,
   getPackageId,
+  getPercentage,
   getScanningHTMLSmall,
   hrDivider,
   initWebRenderer,
@@ -27,13 +30,16 @@ import {
   PILLS,
   refreshIcon,
   runNPMCommand,
+  runNPMCommandAsyncAwait,
   splitButton,
   vulFixType
 } from './util';
 
 import { dirname } from 'path';
+import { sendAnalyticsEvent } from './analytics';
 import {
   DEPENDENCY_TYPE,
+  INameVersionType,
   INPMAuditResponseType,
   INPMAuditVulnerabilityType,
   IOutdatedPackageType,
@@ -50,6 +56,7 @@ const SEVERITY = {
 
 const CACHE_KEY = {
   VULNERABILITY: 'vul',
+  ALL_VULNERABILITY: 'all_vul',
   OUTDATED_PACKAGES: 'out'
 };
 let webRenderer: IWebRenderer = new WebRenderer(REPORT_TEMPLATE, REPORT_TITLE);
@@ -401,18 +408,13 @@ const renderDependency = (
                 <th rowspan='2' class='text-align-left'>Name</th>
                 <th colspan='2' class='th-version'>Version</th>
                 <th colspan='3' class='th-out'>Outdated Status</th>
-                <th colspan='2' class='th-vul'>Vulnerabilities</th>
             </tr>
             <tr>
                 <th class='th-version' style='width:110px'>Configured</th>
                 <th class='th-version' style='width:110px'>Installed</th>
-
                 <th class='th-out' style='width:80px'>Outdated</th>
                 <th class='th-out' style='width:110px'>Wanted</th>
                 <th class='th-out' style='width:110px'>Latest</th>
-
-                <th class='th-vul' style='width:110px'>Count</th>
-                <th class='th-vul' style='width:110px'>Fix Available</th>
             </tr>
 
           </thead>
@@ -462,12 +464,6 @@ const renderDependency = (
       });
     }
 
-    const { vulNoDataHTML, vulCountHTML, fixAvlHTML } = vulnerabilityColumn(
-      id,
-      vulFromCache,
-      vulFromCache?.count
-    );
-
     const { outdatedNoDataHTML, isOutdatedHTML, wantedHTML, latestHTML } =
       getOutdatedCellHTML(pkgId, webRenderer, outCache);
 
@@ -497,15 +493,6 @@ const renderDependency = (
             </td>
             <td class='td-out' id='td_out_wanted_${pkgId}'>${wantedHTML}</td>
             <td class='td-out' id='td_out_latest_${pkgId}'>${latestHTML}</td>
-             
-
-            <td>
-              <div id='td_vul_${id}'>${vulNoDataHTML || vulCountHTML}</div>
-            </td>
-
-            <td>
-              <div id='td_vul_fix_${id}'>${fixAvlHTML}</div>
-            </td>
           </tr>`;
   });
 
@@ -635,7 +622,10 @@ const handleAuditingState = (webRenderer: IWebRenderer) => {
   }
 };
 
-const processAuditResponse = (webRenderer: IWebRenderer, auditData: any) => {
+const processAuditResponse = async (
+  webRenderer: IWebRenderer,
+  auditData: any
+) => {
   const directPackages: IRecord = getDirectPackages(webRenderer);
   const installedPackages = webRenderer.packagesWithVersion;
   // Initialize an object to hold the vulnerabilities by package
@@ -707,6 +697,7 @@ const processAuditResponse = (webRenderer: IWebRenderer, auditData: any) => {
           packageName,
           dependencyType: getDepType(packageName),
           hasVulnerability: total > 0,
+          isDirect: Boolean(directPackages[packageName]),
           count: {
             ...vulCount,
             t: total
@@ -731,11 +722,11 @@ const processAuditResponse = (webRenderer: IWebRenderer, auditData: any) => {
       processVulnerabilities(packageName, via, fixAvailable, range);
 
       // Process vulnerabilities for the dependent packages
-      if (effects && Array.isArray(effects)) {
-        effects.forEach((dependentPackage) => {
-          processVulnerabilities(dependentPackage, via, fixAvailable, range);
-        });
-      }
+      // if (effects && Array.isArray(effects)) {
+      //   effects.forEach((dependentPackage) => {
+      //     processVulnerabilities(dependentPackage, via, fixAvailable, range);
+      //   });
+      // }
     }
   } else {
     return [];
@@ -778,75 +769,51 @@ const processAuditResponse = (webRenderer: IWebRenderer, auditData: any) => {
     }
   });
 
+  await EXTENSION_STATE_MANAGER.setItem(
+    webRenderer.context,
+    `${webRenderer.projectId}_${CACHE_KEY.ALL_VULNERABILITY}`,
+    {
+      projectID: webRenderer.projectId,
+      data: vulnerabilitiesByPackage,
+      timeStamp: new Date()
+    }
+  );
+
+  // const transientVulnerabilities: Array<INPMAuditResponseType> =
+  //   await mapTransitiveVulnerabilities(
+  //     vulnerabilitiesByPackage,
+  //     [],
+  //     directPackages,
+  //     0
+  //   );
+
+  // await logInFile(transientVulnerabilities, webRenderer.extensionPath);
+
   return directPackageVulnerabilities;
 };
 
-const renderVulnerabilityDetails = (webRenderer: IWebRenderer) => {
-  const { vulnerabilities } = webRenderer.summary || {};
-  if (vulnerabilities.length === 0) {
-    webRenderer.sendMessageToUI('vulnerability_detail_table', {
-      htmlContent: null
-    });
-    return;
-  }
-
-  const initCount = { c: 0, h: 0, m: 0, l: 0, t: 0 };
-
-  let count = {
-    Prod: {
-      ...initCount
-    },
-    Dev: {
-      ...initCount
-    },
-    Peer: {
-      ...initCount
-    },
-    Optional: {
-      ...initCount
-    }
-  };
-
-  vulnerabilities.map((itm: INPMAuditResponseType) => {
-    if (itm.count) {
-      count[itm.dependencyType].c += itm.count.c;
-      count[itm.dependencyType].h += itm.count.h;
-      count[itm.dependencyType].m += itm.count.m;
-      count[itm.dependencyType].l += itm.count.l;
-      count[itm.dependencyType].t +=
-        itm.count.c + itm.count.h + itm.count.m + itm.count.l;
-    }
-  });
-
-  const hasVulnerability =
-    count['Prod']?.t +
-      count['Dev']?.t +
-      count['Peer']?.t +
-      count['Optional']?.t >
-    0;
-
-  if (!hasVulnerability) {
-    webRenderer.sendMessageToUI('vulnerabilityDetailTableContent', {
-      htmlContent: null
-    });
-    return;
-  }
-
-  let htmlStr = `<div class='content-box bg-white'>
-          <h2 class="header-section">Vulnerabilities</h2> 
-          <div class="hint mt-1">Dependencies with found vulnerabilities.</div>
+const renderVulnerabilityTable = (
+  vulnerabilities: Array<INPMAuditResponseType>,
+  type: 'direct' | 'transitive'
+) => {
+  let htmlStr = `
+          <div class='content-box bg-white'>
+          <h2 class="header-section">Vulnerabilities in ${capitalizeFirstLetter(
+            type
+          )} Dependencies  (${vulnerabilities.length})</h2> 
+          <div class="hint mt-1">Vulnerabilities found in <b>${type}</b> dependencies.</div>
 
           <table class='table table-sm table-bordered simple-table'>
               <thead>
                 <tr>
                     <th>Package</th>
+                    ${type === 'transitive' ? `<th>Parent Package</th>` : ''}
                     <th>Severity</th>
                     <th>Description</th>
-                    <th>Range</th>
-                    <th>Score <span class='text-sm text-grey'>*</span></th>
-                    <th>Weaknesses <span class='text-sm text-grey'>#</span></th>
-                    <th>Fix Available</th>
-                    <th style='width:80px' class='text-center'>Action</th>
+                    <th style='width:120px'>Range</th>
+                    <th style='width:60px'>Score <span class='text-sm text-grey'>*</span></th>
+                    <th>Weakness <span class='text-sm text-grey'>#</span></th>
+                    <th style='width:100px'>Fix Available</th>
                 </tr>
               </thead>
 
@@ -860,6 +827,7 @@ const renderVulnerabilityDetails = (webRenderer: IWebRenderer) => {
       const vulsCount = vulnerability.vulnerabilities?.length;
       vulnerability.vulnerabilities.map(
         (vul: INPMAuditVulnerabilityType, index: number) => {
+          const { c, h, m, l, t } = vulnerability.count || {};
           let fixAvlCls = '';
           let fixBtnTxt = ``;
           switch (vul.fixAvailable) {
@@ -872,7 +840,7 @@ const renderVulnerabilityDetails = (webRenderer: IWebRenderer) => {
                                     '${vul.fixPackageName}@${vul.fixPackageVersion}', 
                                     '${webRenderer.parentPath}')"`,
                 '',
-                'critical sm disable-on-browser'
+                'critical sm disable-on-browser mt-1'
               );
 
             case 'No':
@@ -881,45 +849,79 @@ const renderVulnerabilityDetails = (webRenderer: IWebRenderer) => {
 
             case 'Yes':
               fixAvlCls = 'green';
-              fixBtnTxt = splitButton(
-                `${checkIcon()}`,
-                `Fix`,
-                `onclick="fixAutoFixableVulnerabilities('${webRenderer.parentPath}')"`,
-                '',
-                'success sm disable-on-browser'
-              );
-              break;
           }
 
           htmlStr += `<tr>`;
 
-          const pkgLink = `<a 
+          let pkgCellContent = `
+            <a 
               href='#${getPackageId(vulnerability.packageName)}' 
               class='internal-link'>
                 ${vulnerability.packageName}
-            </a>`;
+            </a>
+
+            <span class='grey-header text-sm'>
+                &nbsp;(v${vul.installedVersion})
+            </span>`;
+
+          pkgCellContent += `
+            <div class='flex flex-gap-5 flex-justify-start mt-1 mb-1'>
+            ${
+              c > 0
+                ? PILLS.SEVERITY.CRITICAL(c, 'C', true)
+                : PILLS.GREY(c, 'C', true)
+            }
+            ${
+              h > 0
+                ? PILLS.SEVERITY.HIGH(h, 'H', true)
+                : PILLS.GREY(h, 'H', true)
+            }
+            ${
+              m > 0
+                ? PILLS.SEVERITY.MODERATE(m, 'M', true)
+                : PILLS.GREY(m, 'M', true)
+            }
+            ${
+              l > 0
+                ? PILLS.SEVERITY.LOW(l, 'L', true)
+                : PILLS.GREY(l, 'L', true)
+            }
+            `;
+
+          pkgCellContent += `</div>
+        `;
+
+          const parentDepFindBtn = `<div class='find-direct-pgk'>
+              <div id='dp_${getPackageId(vulnerability.packageName)}'> 
+                  <button  
+                    class='direct-pgk-btn flex-justify-center w-100' 
+                    onclick="findDirectPackage('${vulnerability.packageName}')">
+                      ${eyeIcon(18)} Find
+                  </button>
+                </div>
+              </div>`;
 
           if (vulsCount > 1) {
             if (index == 0) {
               htmlStr += `
-                  <td rowspan='${vulsCount}'>
-                    ${pkgLink}
-                    <div class='grey-header text-sm'>v${vul.installedVersion}</div>
-                 </td>`;
+                  <td rowspan='${vulsCount}'>${pkgCellContent}</td>`;
+
+              if (type === 'transitive') {
+                htmlStr += `
+                    <td rowspan='${vulsCount}'>${parentDepFindBtn}</td>`;
+              }
             }
           } else {
-            htmlStr += `
-                <td>
-                    ${pkgLink}
-                    <div class='grey-header text-sm'>v${vul.installedVersion}</div>
-                </td>`;
+            htmlStr += `<td>${pkgCellContent}</td>`;
+
+            if (type === 'transitive') {
+              htmlStr += `<td>${parentDepFindBtn}</td>`;
+            }
           }
 
           htmlStr += `
-          <td>
-            <div class='severity-box severity-${vul.severity}'>
-                ${vul.severity}
-            </div>
+          <td class='b text-${vul.severity}'>
+                ${capitalizeFirstLetter(vul.severity)}
           </td>
 
           <td>
@@ -927,8 +929,6 @@ const renderVulnerabilityDetails = (webRenderer: IWebRenderer) => {
               ${vul.title}
             </a>
           </td>
-
-          
 
           <td>${vul.range}</td>
           <td>${vul.cvss?.score}</td>
@@ -950,12 +950,11 @@ const renderVulnerabilityDetails = (webRenderer: IWebRenderer) => {
           <td>
            <div class='b text-${fixAvlCls}'>
                 ${vul.fixAvailable}
+                ${vul.fixAvailable === 'Breaking' ? fixBtnTxt : ''}
             </div>
           </td>
 
-          <td>
-           ${fixBtnTxt}
-          </td>
+          
 
       </tr>`;
         }
@@ -964,49 +963,31 @@ const renderVulnerabilityDetails = (webRenderer: IWebRenderer) => {
   });
 
   htmlStr += `</tbody>
-            </table>
+            </table>`;
 
+  htmlStr += `
             ${hrDivider}
             <div class='grey-header text-sm mb3px'>* Score: This CVSS score calculates overall vulnerability severity from 0 to 10 and is based on the Common Vulnerability Scoring System (CVSS).</div>
             <div class='grey-header text-sm'>* Weakness: Common Weakness Enumeration (CWE) is a list of software and hardware weaknesses.</div>
-            
         </div>`;
 
-  webRenderer.sendMessageToUI('vulnerabilityDetailTableContent', {
-    htmlContent: htmlStr
-  });
+  return htmlStr;
 };
 
-const renderVulnerabilitySummary = (webRenderer: IWebRenderer) => {
-  renderVulnerabilityDetails(webRenderer);
+const renderVulnerabilityDetails = async (webRenderer: IWebRenderer) => {
+  const allVulCache = await EXTENSION_STATE_MANAGER.getItem(
+    webRenderer.context,
+    `${webRenderer.projectId}_${CACHE_KEY.ALL_VULNERABILITY}`
+  );
 
-  const renderVulRow = (
-    dependencyType: 'Prod' | 'Dev' | 'Peer' | 'Optional',
-    count: IRecord
-  ) => {
-    if (count[dependencyType].t === 0) {
-      return '';
-    }
-
-    const countVal = count[dependencyType] || {};
-
-    return `<tr>
-              <td>${dependencyType}</td>
-              <td class='b text-right text-critical'>${countVal.c}</td>
-              <td class='b text-right text-high'>${countVal.h}</td>
-              <td class='b text-right text-moderate'>${countVal.m}</td>
-              <td class='b text-right text-low'>${countVal.l}</td>
-              <td class='b text-right text-grey'>${countVal.t}</td>
-            </tr>`;
-  };
-
-  const { vulnerabilities } = webRenderer.summary || {};
-  if (vulnerabilities.length === 0) {
-    webRenderer.sendMessageToUI('updateVulnerabilitySummaryContent', {
+  if (!allVulCache || !allVulCache.data) {
+    webRenderer.sendMessageToUI('vulnerability_detail_table', {
       htmlContent: null
     });
     return;
   }
+
+  const vulnerabilities = allVulCache.data;
 
   const initCount = { c: 0, h: 0, m: 0, l: 0, t: 0 };
 
@@ -1025,6 +1006,14 @@ const renderVulnerabilitySummary = (webRenderer: IWebRenderer) => {
     }
   };
 
+  const directVulnerabilities = vulnerabilities.filter(
+    (vul: INPMAuditResponseType) => vul.isDirect
+  );
+
+  const transientVulnerabilities = vulnerabilities.filter(
+    (vul: INPMAuditResponseType) => !vul.isDirect
+  );
+
   vulnerabilities.map((itm: INPMAuditResponseType) => {
     if (itm.count) {
       count[itm.dependencyType].c += itm.count.c;
@@ -1036,12 +1025,160 @@ const renderVulnerabilitySummary = (webRenderer: IWebRenderer) => {
     }
   });
 
-  const hasVulnerability =
+  const totalVulnerabilityCount =
     count['Prod']?.t +
-      count['Dev']?.t +
-      count['Peer']?.t +
-      count['Optional']?.t >
-    0;
+    count['Dev']?.t +
+    count['Peer']?.t +
+    count['Optional']?.t;
+
+  const hasVulnerability = totalVulnerabilityCount > 0;
+
+  if (!hasVulnerability) {
+    webRenderer.sendMessageToUI('vulnerabilityDetailTableContent', {
+      htmlContent: null
+    });
+    return;
+  }
+
+  let htmlStr = `<div class='flex-group flex-direction-column flex-gap-2 w-100'>`;
+
+  if (directVulnerabilities.length > 0) {
+    htmlStr += renderVulnerabilityTable(directVulnerabilities, 'direct');
+  }
+
+  if (transientVulnerabilities.length > 0) {
+    htmlStr += renderVulnerabilityTable(transientVulnerabilities, 'transitive');
+  }
+
+  htmlStr += '</div>';
+
+  webRenderer.sendMessageToUI('vulnerabilityDetailTableContent', {
+    htmlContent: htmlStr
+  });
+};
+
+const renderVulnerabilitySummary = async (webRenderer: IWebRenderer) => {
+  renderVulnerabilityDetails(webRenderer);
+
+  const renderVulRow = (
+    dependencyType: 'Direct' | 'Transitive' | 'Total',
+    vulList: Array<INPMAuditResponseType>
+  ) => {
+    let c = 0;
+    let h = 0;
+    let m = 0;
+    let l = 0;
+    vulList.map((vul: INPMAuditResponseType) => {
+      c += (vul.vulnerabilities || []).filter(
+        (itm: INPMAuditVulnerabilityType) => itm.severity === 'critical'
+      ).length;
+
+      h += (vul.vulnerabilities || []).filter(
+        (itm: INPMAuditVulnerabilityType) => itm.severity === 'high'
+      ).length;
+
+      m += (vul.vulnerabilities || []).filter(
+        (itm: INPMAuditVulnerabilityType) => itm.severity === 'moderate'
+      ).length;
+
+      l += (vul.vulnerabilities || []).filter(
+        (itm: INPMAuditVulnerabilityType) => itm.severity === 'low'
+      ).length;
+    });
+
+    const t = c + h + m + l;
+
+    return `<tr>
+              <td>${dependencyType}
+              ${
+                dependencyType === 'Total'
+                  ? `<div class='percentage'>%</div>`
+                  : ''
+              }
+              </td>
+              <td class='b text-right'>
+                <div class='b text-critical'>${c}</div>
+                 ${
+                   dependencyType === 'Total'
+                     ? `<div class='percentage'>${getPercentage(c, t)}</div>`
+                     : ''
+                 }
+              </td>
+
+              <td class='b text-right'>
+                <div class='b text-high'>${h}</div>
+                ${
+                  dependencyType === 'Total'
+                    ? `<div class='percentage'>${getPercentage(h, t)}</div>`
+                    : ''
+                }
+              </td>
+
+              <td class='b text-right'>
+                <div class='b text-moderate'>${m}</div>
+                ${
+                  dependencyType === 'Total'
+                    ? `<div class='percentage'>${getPercentage(m, t)}</div>`
+                    : ''
+                }
+              </td>
+              <td class='b text-right'>
+                <div class='b text-low'>${l}</div>
+                ${
+                  dependencyType === 'Total'
+                    ? `<div class='percentage'>${getPercentage(l, t)}</div>`
+                    : ''
+                }
+              </td>
+              <td class='b text-right text-grey'>${t}
+              ${
+                dependencyType === 'Total'
+                  ? `<div class='percentage'>100%</div>`
+                  : ''
+              }
+              </td>
+            </tr>`;
+  };
+
+  const allVulCache = await EXTENSION_STATE_MANAGER.getItem(
+    webRenderer.context,
+    `${webRenderer.projectId}_${CACHE_KEY.ALL_VULNERABILITY}`
+  );
+
+  if (!allVulCache || !allVulCache.data) {
+    webRenderer.sendMessageToUI('updateVulnerabilitySummaryContent', {
+      htmlContent: null
+    });
+    return;
+  }
+
+  const vulnerabilities = allVulCache.data;
+
+  if (vulnerabilities.length === 0) {
+    webRenderer.sendMessageToUI('updateVulnerabilitySummaryContent', {
+      htmlContent: null
+    });
+    return;
+  }
+
+  const directVulnerabilities = vulnerabilities.filter(
+    (vul: INPMAuditResponseType) => vul.isDirect
+  );
+
+  const transientVulnerabilities = vulnerabilities.filter(
+    (vul: INPMAuditResponseType) => !vul.isDirect
+  );
+
+  const totalDirectVulCount = directVulnerabilities.reduce(
+    (acc: number, val: INPMAuditResponseType) => acc + val.count.t,
+    0
+  );
+
+  const totalTransitiveVulCount = transientVulnerabilities.reduce(
+    (acc: number, val: INPMAuditResponseType) => acc + val.count.t,
+    0
+  );
+  const hasVulnerability = totalDirectVulCount + totalTransitiveVulCount > 0;
 
   let htmlStr = `<div class='content-box bg-white'>
           <h2 class="header-section">Vulnerabilities</h2> 
@@ -1062,10 +1199,10 @@ const renderVulnerabilitySummary = (webRenderer: IWebRenderer) => {
               </thead>
 
               <tbody>
-                ${renderVulRow('Prod', count)}
-                ${renderVulRow('Dev', count)}
-                ${renderVulRow('Peer', count)}
-                ${renderVulRow('Optional', count)}
+                ${renderVulRow('Direct', directVulnerabilities)}
+                ${renderVulRow('Transitive', transientVulnerabilities)}
+                ${renderVulRow('Total', vulnerabilities)}
+                
               </tbody>
             </table>
 
@@ -1417,7 +1554,7 @@ const renderNPMAuditResponse = async (webRenderer: IWebRenderer, data: any) => {
   }
 
   const directPackageVulnerabilities: Array<INPMAuditResponseType> =
-    processAuditResponse(webRenderer, data);
+    await processAuditResponse(webRenderer, data);
 
   (directPackageVulnerabilities || []).map((itm: INPMAuditResponseType) => {
     const { vulNoDataHTML, vulCountHTML, fixAvlHTML } = vulnerabilityColumn(
@@ -1447,34 +1584,6 @@ const renderNPMAuditResponse = async (webRenderer: IWebRenderer, data: any) => {
   );
 
   await renderSummary(webRenderer, new Date());
-};
-
-const getCurrentVersion = (packageName: string, packageJSON: IRecord) => {
-  if (!packageJSON) {
-    return null;
-  }
-
-  const { dependencies, devDependencies, peerDependencies } = packageJSON;
-
-  if (dependencies) {
-    if (dependencies[packageName]) {
-      return cleanVersion(dependencies[packageName]);
-    }
-  }
-
-  if (devDependencies) {
-    if (devDependencies[packageName]) {
-      return cleanVersion(devDependencies[packageName]);
-    }
-  }
-
-  if (peerDependencies) {
-    if (peerDependencies[packageName]) {
-      return cleanVersion(peerDependencies[packageName]);
-    }
-  }
-
-  return null;
 };
 
 const getOutdatedCellHTML = (
@@ -1527,6 +1636,32 @@ const getOutdatedCellHTML = (
   };
 };
 
+const getOutdatedSeverity = (
+  configuredVersion: string,
+  installedVersion: string
+) => {
+  const ignoreVersions = ['*', 'latest'];
+
+  if (
+    !installedVersion ||
+    ignoreVersions.includes(installedVersion) ||
+    ignoreVersions.includes(configuredVersion)
+  ) {
+    return SEVERITY.NORMAL;
+  }
+
+  const hasLowerInstalledVersion = isLowerVersion(
+    cleanVersion(installedVersion),
+    configuredVersion
+  );
+
+  if (hasLowerInstalledVersion === -1) {
+    return SEVERITY.NORMAL;
+  }
+
+  return hasLowerInstalledVersion ? SEVERITY.HIGH : SEVERITY.MEDIUM;
+};
+
 const renderOutdatedPackages = async (
   webRenderer: IWebRenderer,
   data: IRecord
@@ -1576,13 +1711,6 @@ const renderOutdatedPackages = async (
     return;
   }
 
-  const {
-    devDependencies = {},
-    dependencies = {},
-    peerDependencies = {},
-    optionalDependencies = {}
-  } = webRenderer.pkgJSON;
-
   const directPackages: IRecord = getDirectPackages(webRenderer);
   let outdatedList: Array<IOutdatedPackageType> = [];
   for (const [key, itm] of Object.entries<any>(data)) {
@@ -1629,11 +1757,7 @@ const renderOutdatedPackages = async (
         current: installedVersion,
         wanted: found.wanted,
         latest: found.latest,
-        severity: installedVersion
-          ? isLowerVersion(cleanVersion(installedVersion), found.wanted)
-            ? SEVERITY.HIGH
-            : SEVERITY.MEDIUM
-          : SEVERITY.MEDIUM
+        severity: getOutdatedSeverity(found.wanted, installedVersion)
       };
     }
 
@@ -1750,6 +1874,8 @@ export const dependencyCommand = async (context: any, uri: any) => {
       }
     }
   );
+
+  sendAnalyticsEvent(webRenderer, 'DEPENDENCY', 'VIEWED_DEPENDENCY_PAGE');
 };
 
 const clearCache = async (webRenderer: IWebRenderer) => {
@@ -1781,4 +1907,67 @@ export const scanAgain = async (webRenderer: IWebRenderer) => {
 
   runNPMAudit(webRenderer);
   getOutdatedPackages(webRenderer);
+  sendAnalyticsEvent(webRenderer, 'DEPENDENCY', 'AUDITED', 'SCAN_AGAIN');
+};
+
+export const findDirectPackageOfChildPackage = async (
+  webRenderer: IWebRenderer,
+  packageName: string
+) => {
+  const id = getPackageId(packageName);
+  webRenderer.sendMessageToUI('updateDirectPackageContent', {
+    id,
+    htmlContent: `<div class='find-direct-pgk' >
+                      <button class='direct-pgk-btn flex-justify-center w-100'>
+                          ${getLoaderIcon(18)}
+                    </button>
+                  </div>`
+  });
+
+  const { success, resp } = await runNPMCommandAsyncAwait(
+    webRenderer,
+    `npm list ${packageName} --json `
+  );
+
+  let parentPackages: Array<INameVersionType> = [];
+  if (success && resp) {
+    Object.keys(resp.dependencies || {}).map((key: string) => {
+      parentPackages = [
+        ...parentPackages,
+        {
+          packageName: key,
+          version: resp.dependencies[key].version
+        }
+      ];
+    });
+
+    if (parentPackages.length === 0) {
+      webRenderer.sendMessageToUI('updateDirectPackageContent', {
+        id,
+        htmlContent: `<div class='text-warning'>No found.</div>`
+      });
+      return;
+    }
+
+    webRenderer.sendMessageToUI('updateDirectPackageContent', {
+      id,
+      htmlContent: `<div class='flex flex-gap-5 flex-justify-start text-sm'>
+        ${parentPackages
+          .map((itm: INameVersionType) => itm.packageName)
+          .join(', ')}
+        </div>`
+    });
+  } else {
+    webRenderer.sendMessageToUI('updateDirectPackageContent', {
+      id,
+      htmlContent: `<div class='text-danger'>Error</div>`
+    });
+  }
+
+  sendAnalyticsEvent(
+    webRenderer,
+    'DEPENDENCY',
+    'FIND_PARENT_PACKAGE',
+    packageName
+  );
 };

@@ -67,12 +67,18 @@ export interface INPMAuditVulnerabilityType {
   recommendation?: string;
 }
 
+export interface INameVersionType {
+  packageName: string;
+  version: string;
+}
 export interface INPMAuditResponseType {
   id: string;
   packageName: string;
   dependencyType: 'Prod' | 'Dev' | 'Peer' | 'Optional';
+  isDirect?: boolean;
   version: string;
   hasVulnerability: boolean;
+  parentPackages?: Array<INameVersionType>;
   count: { c: number; h: number; m: number; l: number; t: number };
   vulnerabilities?: Array<INPMAuditVulnerabilityType>;
 }

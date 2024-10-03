@@ -124,5 +124,9 @@ window.addEventListener('message', (event: IRecord) => {
       }
 
       break;
+
+    case 'updateDirectPackageContent':
+      setContent(`dp_${data.id}`, data.htmlContent);
+      break;
   }
 });
